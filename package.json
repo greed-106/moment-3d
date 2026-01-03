@@ -7,8 +7,6 @@
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
-    "assets:clean": "node scripts/clean-assets.js",
-    "assets:download": "node scripts/download-assets.js",
     "lint": "biome check .",
     "lint:fix": "biome check . --write"
   },
