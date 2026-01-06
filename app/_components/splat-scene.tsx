@@ -83,7 +83,13 @@ export function SplatScene({
 
       // 只有非None效果才更新动画时间
       if (effect !== "None") {
-        baseTimeRef.current += 1 / 60;
+        // 移动端加速时间流逝，提升效果变化速度
+        const timeMultiplier = typeof window !== "undefined" && 
+          (window.innerWidth <= 768 || 
+           /mobile|android|iphone|ipad|tablet/i.test(navigator.userAgent)) 
+          ? 2.0 : 1.2;
+        
+        baseTimeRef.current += (1 / 60) * timeMultiplier;
         animateT.value = baseTimeRef.current;
         meshRef.current.updateVersion();
       }

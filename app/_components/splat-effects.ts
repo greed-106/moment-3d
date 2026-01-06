@@ -94,15 +94,16 @@ const effectStatements = ({
     ${outputs.gsplat} = ${inputs.gsplat};
     
   } else if (${inputs.effectType} == 1) {
-    // Magic Effect: Complex twister with noise and radial reveal
+    // Magic Effect: Complex twister with noise and radial reveal (优化版本 - 更早出现光波)
     float border = abs(s-l-.5);
     localPos *= 1.-.2*exp(-20.*border);
     vec3 finalScales = mix(scales,vec3(0.002),smoothstep(s-.5,s,l+.5));
     ${outputs.gsplat}.center = localPos + .1*noise(localPos.xyz*2.+t*.5)*smoothstep(s-.5,s,l+.5);
     ${outputs.gsplat}.scales = finalScales;
+    // 加速光波出现：将 t-3.1416 改为 t-1.0，让光波更早出现
     float at = atan(localPos.x,localPos.z)/3.1416;
-    ${outputs.gsplat}.rgba *= step(at,t-3.1416);
-    ${outputs.gsplat}.rgba += exp(-20.*border) + exp(-50.*abs(t-at-3.1416))*.5;
+    ${outputs.gsplat}.rgba *= step(at,t-1.0);
+    ${outputs.gsplat}.rgba += exp(-20.*border) + exp(-50.*abs(t-at-1.0))*.5;
     
   } else if (${inputs.effectType} == 2) {
     // Spread Effect: Gentle radial emergence with scaling
