@@ -127,4 +127,46 @@ npm run lint
 
 # 代码格式化
 npm run lint:fix
+
+# 构建并打包部署文件
+npm run package
+```
+
+## 构建和部署
+
+使用内置的打包脚本，一键构建并生成部署包：
+
+```bash
+# 构建并打包
+npm run package
+```
+
+这个命令会：
+1. 自动执行 `npm run build`
+2. 检查必要文件是否存在
+3. 将部署文件打包成 ZIP 文件
+4. 生成带时间戳的部署包（如：`moment3d-2024-01-06T15-30-45.zip`）
+
+### 部署步骤
+
+1. **本地构建打包**
+```bash
+npm run package
+```
+
+2. **上传到服务器**
+
+3. **服务器部署**
+```bash
+# 解压
+unzip moment3d-*.zip
+
+# 安装生产依赖
+npm ci --only=production
+
+# 配置环境变量
+nano .env.local
+
+# 启动服务
+npm start
 ```

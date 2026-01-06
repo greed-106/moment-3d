@@ -8,7 +8,8 @@
     "build": "next build --turbopack",
     "start": "next start",
     "lint": "biome check .",
-    "lint:fix": "biome check . --write"
+    "lint:fix": "biome check . --write",
+    "package": "node scripts/build-and-package.cjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.5.1",
@@ -24,6 +25,7 @@
     "@types/node": "^22.16.4",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
+    "archiver": "^7.0.1",
     "tailwindcss": "^4.1.8",
     "typescript": "^5.8.3"
   }
