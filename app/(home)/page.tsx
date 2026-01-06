@@ -6,6 +6,7 @@ import { Canvas } from "@react-three/fiber";
 import { SplatScene } from "@/app/_components/splat-scene";
 import { ProgressBar } from "./_components/progress-bar";
 import { InteractionTutorial } from "@/app/_components/interaction-tutorial";
+import { TutorialButton } from "@/app/_components/tutorial-button";
 
 type ProcessStatus =
   | "idle"
@@ -168,6 +169,16 @@ export default function Home() {
     }
   }, []);
 
+  const handleTutorialClick = () => {
+    setShowTutorial(true);
+    // 记录用户已查看过教程
+    localStorage.setItem("moment3d-tutorial-seen", "true");
+  };
+
+  const handleCloseTutorial = () => {
+    setShowTutorial(false);
+  };
+
   const isProcessing = status !== "idle" && status !== "failed" && !isNavigating;
 
   return (
@@ -282,18 +293,15 @@ export default function Home() {
         </div>
       )}
 
-      {/* 交互指南按钮 */}
-      <button
-        onClick={() => setShowTutorial(true)}
-        className="absolute bottom-6 right-6 bg-white/80 backdrop-blur-sm hover:bg-white border border-stone-200/50 text-stone-700 hover:text-stone-800 px-4 py-2 rounded-lg transition-colors font-medium shadow-lg flex items-center gap-2 z-40"
-      >
-        <span>🎮</span>
-        交互指南
-      </button>
+      {/* 交互教程按钮 */}
+      <TutorialButton
+        onClick={handleTutorialClick}
+        className="absolute top-6 right-6 z-40"
+      />
 
-      {/* 交互指南弹窗 */}
+      {/* 交互教程弹窗 */}
       {showTutorial && (
-        <InteractionTutorial onClose={() => setShowTutorial(false)} />
+        <InteractionTutorial onClose={handleCloseTutorial} />
       )}
     </main>
   );

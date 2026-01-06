@@ -43,6 +43,24 @@ export default function ViewerPage({ params }: ViewerPageProps) {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  // 检查是否需要显示交互教程
+  useEffect(() => {
+    const hasSeenTutorial = localStorage.getItem("moment3d-tutorial-seen");
+    if (!hasSeenTutorial) {
+      // 延迟显示，等待页面加载完成
+      const timer = setTimeout(() => {
+        setShowTutorial(true);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  // 关闭教程时记录状态
+  const handleCloseTutorial = () => {
+    setShowTutorial(false);
+    localStorage.setItem("moment3d-tutorial-seen", "true");
+  };
+
   // 移动端切换到 Spread 时自动切换为 Magic
   useEffect(() => {
     if (isMobile && effect === "Spread") {
@@ -109,12 +127,16 @@ export default function ViewerPage({ params }: ViewerPageProps) {
       </header>
 
       {/* 粒子效果控制 */}
-      <div className="absolute top-20 right-6 bg-white/90 backdrop-blur-sm p-4 rounded-xl border border-stone-200/50 text-stone-800 min-w-[180px] z-40 shadow-lg pointer-events-auto">
+      <div className="absolute top-6 right-6 bg-white/90 backdrop-blur-sm p-4 rounded-xl border border-stone-200/50 text-stone-800 min-w-[180px] z-40 shadow-lg pointer-events-auto">
         <div className="mb-3 font-semibold text-sm flex items-center gap-2">
           粒子效果
-          {isMobile && (
+          {isMobile ? (
             <span className="text-xs text-stone-500 bg-stone-100 px-2 py-1 rounded">
               移动端优化
+            </span>
+          ) : (
+            <span className="text-xs text-stone-500 bg-stone-100 px-2 py-1 rounded">
+              PC端优化
             </span>
           )}
         </div>
@@ -131,18 +153,9 @@ export default function ViewerPage({ params }: ViewerPageProps) {
         </select>
       </div>
 
-      {/* 交互教程按钮 */}
-      <button
-        onClick={() => setShowTutorial(true)}
-        className="absolute bottom-6 right-6 bg-white/80 backdrop-blur-sm hover:bg-white border border-stone-200/50 text-stone-700 hover:text-stone-800 px-4 py-2 rounded-lg transition-colors font-medium shadow-lg flex items-center gap-2 z-40 pointer-events-auto"
-      >
-        <span>🎮</span>
-        交互教程
-      </button>
-
       {/* 交互教程弹窗 */}
       {showTutorial && (
-        <InteractionTutorial onClose={() => setShowTutorial(false)} />
+        <InteractionTutorial onClose={handleCloseTutorial} />
       )}
     </main>
   );
