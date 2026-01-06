@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Canvas } from "@react-three/fiber";
+import { motion, AnimatePresence } from "framer-motion";
 import { SplatScene } from "@/app/_components/splat-scene";
 import { ProgressBar } from "./_components/progress-bar";
 import { InteractionTutorial } from "@/app/_components/interaction-tutorial";
 import { TutorialButton } from "@/app/_components/tutorial-button";
+import { AnimatedTitle, GlassPanel, ExpandButton } from "@/app/_components/home-ui";
 
 type ProcessStatus =
   | "idle"
@@ -17,14 +19,51 @@ type ProcessStatus =
   | "completed"
   | "failed";
 
+const ENTRANCE_DURATION = 3000;
+
 export default function Home() {
   const router = useRouter();
   const [status, setStatus] = useState<ProcessStatus>("idle");
   const [errorMessage, setErrorMessage] = useState<string>("");
-  const [showPanel, setShowPanel] = useState(true);
   const [showTutorial, setShowTutorial] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // UI 状态
+  const [isSceneLoaded, setIsSceneLoaded] = useState(false);
+  const [isTitleAtTop, setIsTitleAtTop] = useState(false);
+  const [isPanelVisible, setIsPanelVisible] = useState(false);
+  const [isFirstShow, setIsFirstShow] = useState(true);
+
+  const handleSceneLoaded = useCallback(() => {
+    setIsSceneLoaded(true);
+  }, []);
+
+  // 场景加载完成后，3秒后标题开始移动，标题移动完成后再显示面板
+  useEffect(() => {
+    if (!isSceneLoaded) return;
+    // 3秒后标题开始移动
+    const titleTimer = setTimeout(() => {
+      setIsTitleAtTop(true);
+    }, ENTRANCE_DURATION);
+    // 标题移动动画0.8秒 + 额外0.3秒延迟后显示面板
+    const panelTimer = setTimeout(() => {
+      setIsPanelVisible(true);
+    }, ENTRANCE_DURATION + 1100);
+    return () => {
+      clearTimeout(titleTimer);
+      clearTimeout(panelTimer);
+    };
+  }, [isSceneLoaded]);
+
+  const collapsePanel = useCallback(() => {
+    setIsPanelVisible(false);
+  }, []);
+
+  const expandPanel = useCallback(() => {
+    setIsFirstShow(false);
+    setIsPanelVisible(true);
+  }, []);
 
   const handleUpload = useCallback(
     async (file: File) => {
@@ -48,7 +87,6 @@ export default function Home() {
         const newTaskId = data.task_id;
         setStatus(data.status as ProcessStatus);
 
-        // 建立 SSE 连接
         const eventSource = new EventSource(`/api/stream/${newTaskId}`);
         let hasCompleted = false;
 
@@ -79,10 +117,7 @@ export default function Home() {
         eventSource.onerror = () => {
           eventSource.close();
 
-          // 只有在未完成的情况下才尝试重连
           if (!hasCompleted) {
-            console.log("SSE connection lost, attempting to reconnect...");
-
             setTimeout(() => {
               const retrySource = new EventSource(`/api/stream/${newTaskId}`);
 
@@ -104,7 +139,7 @@ export default function Home() {
                   } else {
                     setStatus(retryData.status as ProcessStatus);
                   }
-                } catch (e) {
+                } catch {
                   retrySource.close();
                   setStatus("failed");
                   setErrorMessage("连接中断");
@@ -171,7 +206,6 @@ export default function Home() {
 
   const handleTutorialClick = () => {
     setShowTutorial(true);
-    // 记录用户已查看过教程
     localStorage.setItem("moment3d-tutorial-seen", "true");
   };
 
@@ -196,113 +230,150 @@ export default function Home() {
               "linear-gradient(135deg, #faf7f0 0%, #f5f1e8 50%, #ede7d3 100%)",
           }}
         >
-          <SplatScene url="/demo.sog" effect="Magic" />
+          <SplatScene url="/demo.sog" effect="Magic" onLoaded={handleSceneLoaded} />
         </Canvas>
       </div>
 
-      {/* 毛玻璃卡片 */}
-      {showPanel && (
-        <div className="absolute inset-0 flex items-center justify-center p-6 pointer-events-none z-30">
-          <div
-            onClick={handleClick}
-            className={`
-              pointer-events-auto w-full max-w-md p-8 rounded-2xl
-              bg-white/80 backdrop-blur-sm border border-stone-200/50
-              shadow-xl transition-all duration-300
-              ${status === "idle" || status === "failed" ? "cursor-pointer hover:bg-white/90 hover:shadow-2xl" : ""}
-            `}
-          >
-            <input
-              ref={inputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-              className="hidden"
-            />
-
-            {/* Logo */}
-            <h1 className="text-4xl font-bold text-center mb-2 text-stone-800">
-              Moment3D
-            </h1>
-
-            {/* Slogan */}
-            <p className="text-center text-stone-600 mb-6 text-lg">
-              定格瞬间，留住世界
-            </p>
-
-            {/* 描述文字 */}
-            <p className="text-center text-stone-500 text-sm mb-8 leading-relaxed">
-              每一张照片都承载着珍贵的回忆
-              <br />
-              将美好的时光转化为可以重新体验的 3D 世界
-              <br />
-              让记忆变得触手可及
-            </p>
-
-            {/* 状态区域 */}
-            {status === "idle" && (
-              <div className="text-center">
-                <div className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-stone-700 hover:bg-stone-800 text-white font-medium transition-colors">
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                    />
-                  </svg>
-                  <span>回到那天 →</span>
-                </div>
-                <p className="mt-4 text-stone-400 text-xs">
-                  支持 JPG、PNG 格式 · 点击或拖放图片
-                </p>
-              </div>
-            )}
-
-            {isProcessing && <ProgressBar status={status} />}
-
-            {isNavigating && (
-              <div className="text-center">
-                <div className="inline-flex items-center gap-3 text-stone-600">
-                  <div className="w-5 h-5 border-2 border-stone-600 border-t-transparent rounded-full animate-spin" />
-                  <span className="text-sm">正在跳转...</span>
-                </div>
-              </div>
-            )}
-
-            {status === "failed" && (
-              <div className="text-center space-y-4">
-                <p className="text-red-600 text-sm">{errorMessage}</p>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleReset();
-                  }}
-                  className="px-5 py-2 rounded-lg bg-stone-700 hover:bg-stone-800 text-white text-sm transition-colors"
+      {/* 标题 - 始终存在，位置根据状态变化 */}
+      {isSceneLoaded && (
+        <motion.div
+          className="absolute left-1/2 -translate-x-1/2 z-40 flex flex-col items-center"
+          initial={{ top: "25%", y: "-50%" }}
+          animate={{
+            top: isTitleAtTop ? "1.5rem" : "25%",
+            y: isTitleAtTop ? "0%" : "-50%",
+          }}
+          transition={{
+            duration: 0.8,
+            ease: [0.25, 0.46, 0.45, 0.94],
+          }}
+        >
+          <AnimatedTitle />
+          {/* 展开按钮 - 标题正下方，仅在面板隐藏时显示 */}
+          <div className="h-12 flex items-center justify-center">
+            <AnimatePresence>
+              {isTitleAtTop && !isPanelVisible && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.3 }}
                 >
-                  重试
-                </button>
-              </div>
-            )}
+                  <ExpandButton onClick={expandPanel} />
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
-        </div>
+        </motion.div>
       )}
 
-      {/* 交互教程按钮 */}
-      <TutorialButton
-        onClick={handleTutorialClick}
-        className="absolute top-6 right-6 z-40"
-      />
+      {/* 面板 */}
+      <AnimatePresence mode="wait">
+        {isTitleAtTop && isPanelVisible && (
+          <motion.div
+            className="absolute inset-x-0 top-[33%] -translate-y-1/2 flex justify-center z-30 px-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <GlassPanel onCollapse={collapsePanel} slideDirection={isFirstShow ? "up" : "down"}>
+              <p className="text-center text-stone-700 mb-3 text-xl font-medium">
+                定格瞬间，留住世界
+              </p>
+
+              <p className="text-center text-stone-500 text-sm mb-4 leading-relaxed">
+                每一张照片都承载着珍贵的回忆
+                <br />
+                将美好的时光转化为可以重新体验的 3D 世界
+                <br />
+                让记忆变得触手可及
+              </p>
+
+              <input
+                ref={inputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+
+              {status === "idle" && (
+                <div className="text-center">
+                  <button
+                    type="button"
+                    onClick={handleClick}
+                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg bg-stone-700 hover:bg-stone-800 text-white font-medium transition-colors cursor-pointer"
+                  >
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.5}
+                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                      />
+                    </svg>
+                    <span>回到那天 →</span>
+                  </button>
+                  <p className="mt-3 text-stone-400 text-xs">
+                    支持 JPG、PNG 格式 · 点击或拖放图片
+                  </p>
+                </div>
+              )}
+
+              {isProcessing && <ProgressBar status={status} />}
+
+              {isNavigating && (
+                <div className="text-center">
+                  <div className="inline-flex items-center gap-3 text-stone-600">
+                    <div className="w-5 h-5 border-2 border-stone-600 border-t-transparent rounded-full animate-spin" />
+                    <span className="text-sm">正在跳转...</span>
+                  </div>
+                </div>
+              )}
+
+              {status === "failed" && (
+                <div className="text-center space-y-4">
+                  <p className="text-red-600 text-sm">{errorMessage}</p>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleReset();
+                    }}
+                    className="px-5 py-2 rounded-lg bg-stone-700 hover:bg-stone-800 text-white text-sm transition-colors"
+                  >
+                    重试
+                  </button>
+                </div>
+              )}
+            </GlassPanel>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 交互教程按钮 - 随面板一起显示/隐藏 */}
+      <AnimatePresence>
+        {isPanelVisible && (
+          <motion.div
+            className="absolute top-20 md:top-6 right-4 md:right-6 z-40"
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 50 }}
+            transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+          >
+            <TutorialButton onClick={handleTutorialClick} />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* 交互教程弹窗 */}
-      {showTutorial && (
-        <InteractionTutorial onClose={handleCloseTutorial} />
-      )}
+      {showTutorial && <InteractionTutorial onClose={handleCloseTutorial} />}
     </main>
   );
 }

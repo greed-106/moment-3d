@@ -16,12 +16,14 @@ interface SplatSceneProps {
   url: string;
   effect?: EffectType;
   autoRotate?: boolean;
+  onLoaded?: () => void;
 }
 
 export function SplatScene({
   url,
   effect = "None",
   autoRotate = false,
+  onLoaded,
 }: SplatSceneProps) {
   const renderer = useThree((state) => state.gl);
   const meshRef = useRef<SparkSplatMesh>(null);
@@ -64,8 +66,9 @@ export function SplatScene({
       setupSplatModifier();
       splatLoadedRef.current = true;
       baseTimeRef.current = 0;
+      onLoaded?.();
     }
-  }, [setupSplatModifier]);
+  }, [setupSplatModifier, onLoaded]);
 
   // Reset animation when effect changes
   useEffect(() => {
@@ -87,7 +90,7 @@ export function SplatScene({
         const timeMultiplier = typeof window !== "undefined" && 
           (window.innerWidth <= 768 || 
            /mobile|android|iphone|ipad|tablet/i.test(navigator.userAgent)) 
-          ? 2.0 : 1.2;
+          ? 2.0 : 1.5;
         
         baseTimeRef.current += (1 / 60) * timeMultiplier;
         animateT.value = baseTimeRef.current;

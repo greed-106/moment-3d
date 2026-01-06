@@ -107,7 +107,7 @@ export default function ViewerPage({ params }: ViewerPageProps) {
       <header className="absolute top-0 left-0 right-0 p-6 flex items-center justify-between pointer-events-none z-10">
         <a
           href="/"
-          className="pointer-events-auto flex items-center gap-2 px-4 py-2 rounded-lg bg-white/80 backdrop-blur-sm border border-stone-200/50 text-stone-700 hover:bg-white hover:text-stone-800 transition-colors shadow-lg"
+          className="pointer-events-auto flex items-center gap-2 px-4 py-2 rounded-xl bg-white/70 backdrop-blur-xl border border-white/40 text-stone-700 hover:bg-white/80 hover:text-stone-800 transition-colors shadow-2xl shadow-stone-900/10"
         >
           <svg
             className="w-5 h-5"
@@ -127,7 +127,7 @@ export default function ViewerPage({ params }: ViewerPageProps) {
       </header>
 
       {/* 粒子效果控制 */}
-      <div className="absolute top-6 right-6 bg-white/90 backdrop-blur-sm p-4 rounded-xl border border-stone-200/50 text-stone-800 min-w-[180px] z-40 shadow-lg pointer-events-auto">
+      <div className="absolute top-6 right-6 bg-white/70 backdrop-blur-xl p-4 rounded-xl border border-white/40 text-stone-800 min-w-[180px] z-40 shadow-2xl shadow-stone-900/10 pointer-events-auto">
         <div className="mb-3 font-semibold text-sm flex items-center gap-2">
           粒子效果
           {isMobile ? (
