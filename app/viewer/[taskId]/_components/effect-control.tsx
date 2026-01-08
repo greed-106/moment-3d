@@ -26,7 +26,7 @@ export function EffectControl({
     ];
 
     if (isMobile) {
-      return allEffects.filter((e) => e.value !== "Spread");
+      return allEffects.filter((e) => e.value !== "Spread" && e.value !== "Unroll");
     }
 
     return allEffects;
