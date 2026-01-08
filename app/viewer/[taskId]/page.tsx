@@ -1,64 +1,125 @@
 "use client";
 
-import { use, Suspense, useState, useEffect } from "react";
+import { use, Suspense, useState, useEffect, memo, useRef } from "react";
 import { Canvas } from "@react-three/fiber";
-import { SplatScene } from "@/app/_components/splat-scene";
-import { InteractionTutorial } from "@/app/_components/interaction-tutorial";
+import {
+  SplatScene,
+  type CameraMetadata,
+  parseBackendMetadata,
+  type BackendMetadata,
+  isMobileDevice,
+} from "@/app/_components/splat-viewer";
+import { InteractionTutorial, shouldShowTutorial, markTutorialShown } from "@/app/_components/interaction-tutorial";
 import type { EffectType } from "@/app/_components/splat-effects";
+import { ViewerHeader } from "./_components/viewer-header";
+import { EffectControl } from "./_components/effect-control";
+import { LoadingScreen } from "./_components/loading-screen";
 
 interface ViewerPageProps {
   params: Promise<{ taskId: string }>;
 }
 
+// 相机元数据获取 hook
+function useCameraMetadata(taskId: string) {
+  const [cameraMetadata, setCameraMetadata] = useState<CameraMetadata | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchMetadata = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const response = await fetch(`/api/metadata/${taskId}`);
+
+        if (!response.ok) {
+          throw new Error(`获取元数据失败: ${response.status}`);
+        }
+
+        const data: BackendMetadata = await response.json();
+        const parsed = parseBackendMetadata(data);
+
+        if (parsed) {
+          setCameraMetadata(parsed);
+        } else {
+          console.warn("[useCameraMetadata] Failed to parse metadata, using defaults");
+        }
+      } catch (error) {
+        console.error("[useCameraMetadata] Metadata fetch error:", error);
+        setError(error instanceof Error ? error.message : "未知错误");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMetadata();
+  }, [taskId]);
+
+  return { cameraMetadata, loading, error };
+}
+
+// 将 3D 场景抽离为独立的 memo 组件
+interface SceneViewerProps {
+  taskId: string;
+  effect: EffectType;
+  cameraMetadata: CameraMetadata | null;
+}
+
+const SceneViewer = memo(function SceneViewer({
+  taskId,
+  effect,
+  cameraMetadata,
+}: SceneViewerProps) {
+  return (
+    <Canvas
+      gl={{ antialias: false }}
+      className="h-full w-full"
+      style={{
+        background:
+          "linear-gradient(135deg, #faf7f0 0%, #f5f1e8 50%, #ede7d3 100%)",
+      }}
+    >
+      <SplatScene
+        url={`/api/result/${taskId}`}
+        effect={effect}
+        cameraMetadata={cameraMetadata}
+      />
+    </Canvas>
+  );
+});
+
 export default function ViewerPage({ params }: ViewerPageProps) {
   const { taskId } = use(params);
-  const [showTutorial, setShowTutorial] = useState(false);
   const [effect, setEffect] = useState<EffectType>("None");
-  const [isMobile, setIsMobile] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
+  const tutorialTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // 检测移动端设备
+  const isMobile = isMobileDevice();
+  const { cameraMetadata, loading: metadataLoading, error: metadataError } = useCameraMetadata(taskId);
+
+  // 检查是否需要显示教程
   useEffect(() => {
-    const checkMobile = () => {
-      const userAgent = navigator.userAgent.toLowerCase();
-      const mobileKeywords = [
-        "mobile",
-        "android",
-        "iphone",
-        "ipad",
-        "tablet",
-      ];
-      return (
-        mobileKeywords.some((keyword) => userAgent.includes(keyword)) ||
-        window.innerWidth <= 768
-      );
-    };
-
-    setIsMobile(checkMobile());
-
-    const handleResize = () => {
-      setIsMobile(checkMobile());
-    };
-
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  // 检查是否需要显示交互教程
-  useEffect(() => {
-    const hasSeenTutorial = localStorage.getItem("moment3d-tutorial-seen");
-    if (!hasSeenTutorial) {
-      // 延迟显示，等待页面加载完成
-      const timer = setTimeout(() => {
-        setShowTutorial(true);
-      }, 1000);
-      return () => clearTimeout(timer);
+    // 如果用户选择了"不再提示"，或本次会话已经显示过，则不显示
+    if (!shouldShowTutorial()) {
+      return;
     }
+
+    // 延迟 1 秒后显示教程
+    tutorialTimerRef.current = setTimeout(() => {
+      setShowTutorial(true);
+      markTutorialShown();
+    }, 1000);
+
+    return () => {
+      if (tutorialTimerRef.current) {
+        clearTimeout(tutorialTimerRef.current);
+      }
+    };
   }, []);
 
-  // 关闭教程时记录状态
-  const handleCloseTutorial = () => {
+  const closeTutorial = () => {
     setShowTutorial(false);
-    localStorage.setItem("moment3d-tutorial-seen", "true");
   };
 
   // 移动端切换到 Spread 时自动切换为 Magic
@@ -68,106 +129,34 @@ export default function ViewerPage({ params }: ViewerPageProps) {
     }
   }, [isMobile, effect]);
 
-  // 获取可用的效果选项
-  const getAvailableEffects = () => {
-    const allEffects: { value: EffectType; label: string }[] = [
-      { value: "None", label: "无效果" },
-      { value: "Magic", label: "Magic" },
-      { value: "Spread", label: "Spread" },
-      { value: "Unroll", label: "Unroll" },
-      { value: "Twister", label: "Twister" },
-      { value: "Rain", label: "Rain" },
-    ];
-
-    // 移动端时过滤掉 Spread 效果
-    if (isMobile) {
-      return allEffects.filter((effect) => effect.value !== "Spread");
-    }
-
-    return allEffects;
-  };
-
   return (
     <main className="h-screen w-screen relative overflow-hidden bg-gradient-to-br from-stone-50 to-stone-100">
       {/* 3D 渲染区域 */}
-      <Suspense fallback={<LoadingScreen />}>
-        <Canvas
-          gl={{ antialias: false }}
-          className="h-full w-full"
-          style={{
-            background:
-              "linear-gradient(135deg, #faf7f0 0%, #f5f1e8 50%, #ede7d3 100%)",
-          }}
-        >
-          <SplatScene url={`/api/result/${taskId}`} effect={effect} />
-        </Canvas>
+      <Suspense fallback={<LoadingScreen message="加载场景中..." />}>
+        {metadataLoading ? (
+          <LoadingScreen message="获取场景信息..." />
+        ) : (
+          <SceneViewer
+            taskId={taskId}
+            effect={effect}
+            cameraMetadata={cameraMetadata}
+          />
+        )}
       </Suspense>
 
       {/* 顶部导航 */}
-      <header className="absolute top-0 left-0 right-0 p-6 flex items-center justify-between pointer-events-none z-10">
-        <a
-          href="/"
-          className="pointer-events-auto flex items-center gap-2 px-4 py-2 rounded-xl bg-white/70 backdrop-blur-xl border border-white/40 text-stone-700 hover:bg-white/80 hover:text-stone-800 transition-colors shadow-2xl shadow-stone-900/10"
-        >
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M10 19l-7-7m0 0l7-7m-7 7h18"
-            />
-          </svg>
-          <span>返回</span>
-        </a>
-      </header>
+      <ViewerHeader />
 
       {/* 粒子效果控制 */}
-      <div className="absolute top-6 right-6 bg-white/70 backdrop-blur-xl p-4 rounded-xl border border-white/40 text-stone-800 min-w-[180px] z-40 shadow-2xl shadow-stone-900/10 pointer-events-auto">
-        <div className="mb-3 font-semibold text-sm flex items-center gap-2">
-          粒子效果
-          {isMobile ? (
-            <span className="text-xs text-stone-500 bg-stone-100 px-2 py-1 rounded">
-              移动端优化
-            </span>
-          ) : (
-            <span className="text-xs text-stone-500 bg-stone-100 px-2 py-1 rounded">
-              PC端优化
-            </span>
-          )}
-        </div>
-        <select
-          value={effect}
-          onChange={(e) => setEffect(e.target.value as EffectType)}
-          className="w-full p-2 rounded-lg border border-stone-300 bg-white text-stone-800 text-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-stone-500"
-        >
-          {getAvailableEffects().map((effectOption) => (
-            <option key={effectOption.value} value={effectOption.value}>
-              {effectOption.label}
-            </option>
-          ))}
-        </select>
-      </div>
+      <EffectControl
+        effect={effect}
+        onEffectChange={setEffect}
+        isMobile={isMobile}
+        metadataError={metadataError}
+      />
 
       {/* 交互教程弹窗 */}
-      {showTutorial && (
-        <InteractionTutorial onClose={handleCloseTutorial} />
-      )}
+      {showTutorial && <InteractionTutorial onClose={closeTutorial} />}
     </main>
-  );
-}
-
-function LoadingScreen() {
-  return (
-    <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-stone-50 to-stone-100">
-      <div className="text-center space-y-4">
-        <div className="w-12 h-12 border-2 border-stone-700 border-t-transparent rounded-full animate-spin mx-auto" />
-        <p className="text-stone-600">加载场景中...</p>
-      </div>
-    </div>
   );
 }
