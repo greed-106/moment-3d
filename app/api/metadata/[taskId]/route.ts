@@ -1,0 +1,30 @@
+import { NextRequest, NextResponse } from "next/server";
+
+const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ taskId: string }> }
+) {
+  const { taskId } = await params;
+
+  try {
+    const response = await fetch(`${BACKEND_URL}/metadata/${taskId}`);
+
+    if (!response.ok) {
+      return NextResponse.json(
+        { error: "Metadata not found" },
+        { status: response.status }
+      );
+    }
+
+    const data = await response.json();
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error("Metadata API error:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch metadata" },
+      { status: 500 }
+    );
+  }
+}
