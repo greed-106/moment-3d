@@ -11,7 +11,7 @@ export function ExpandButton({ onClick }: ExpandButtonProps) {
     <motion.button
       type="button"
       onClick={onClick}
-      className="p-2 rounded-full bg-white/60 backdrop-blur-sm border border-stone-200/50 shadow-md hover:bg-white/80 hover:shadow-lg transition-all"
+      className="relative p-2 rounded-full bg-white border border-stone-200 shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:shadow-[0_6px_16px_rgba(0,0,0,0.12)] transition-all overflow-hidden"
       aria-label="展开面板"
       animate={{
         opacity: [0.85, 1, 0.85],
@@ -24,8 +24,11 @@ export function ExpandButton({ onClick }: ExpandButtonProps) {
       }}
       whileHover={{ scale: 1.1, opacity: 1 }}
     >
+      {/* 顶部高光 */}
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/60 to-transparent" />
+      
       <svg
-        className="w-5 h-5 text-stone-600"
+        className="w-5 h-5 text-stone-600 relative"
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"
