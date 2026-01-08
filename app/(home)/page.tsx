@@ -10,9 +10,11 @@ import {
   type CameraMetadata,
   type BackendMetadata,
 } from "@/app/_components/splat-scene";
+import type { ViewMode } from "@/app/_components/splat-viewer";
 import { ProgressBar } from "./_components/progress-bar";
 import { InteractionTutorial } from "@/app/_components/interaction-tutorial";
 import { TutorialButton } from "@/app/_components/tutorial-button";
+import { ModeToggle } from "@/app/_components/mode-toggle";
 import { AnimatedTitle, GlassPanel, ExpandButton } from "@/app/_components/home-ui";
 
 type ProcessStatus =
@@ -29,11 +31,13 @@ const ENTRANCE_DURATION = 3000;
 // 将 3D 场景抽离为独立的 memo 组件，避免父组件状态变化导致重新渲染
 interface SceneBackgroundProps {
   cameraMetadata: CameraMetadata | null;
+  viewMode: ViewMode;
   onLoaded: () => void;
 }
 
 const SceneBackground = memo(function SceneBackground({
   cameraMetadata,
+  viewMode,
   onLoaded,
 }: SceneBackgroundProps) {
   return (
@@ -48,6 +52,7 @@ const SceneBackground = memo(function SceneBackground({
         <SplatScene
           url="/demo.sog"
           effect="Magic"
+          viewMode={viewMode}
           onLoaded={onLoaded}
           cameraMetadata={cameraMetadata}
         />
@@ -69,6 +74,7 @@ export default function Home() {
   const [isTitleAtTop, setIsTitleAtTop] = useState(false);
   const [isPanelVisible, setIsPanelVisible] = useState(false);
   const [isFirstShow, setIsFirstShow] = useState(true);
+  const [viewMode, setViewMode] = useState<ViewMode>("photo");
   
   // Demo 场景的相机元数据
   const [demoCameraMetadata, setDemoCameraMetadata] =
@@ -282,6 +288,7 @@ export default function Home() {
       {/* 3D 背景 - 使用 memo 组件避免重新渲染 */}
       <SceneBackground
         cameraMetadata={demoCameraMetadata}
+        viewMode={viewMode}
         onLoaded={handleSceneLoaded}
       />
 
@@ -406,6 +413,13 @@ export default function Home() {
       {isPanelVisible && (
         <div className="absolute top-20 md:top-6 right-4 md:right-6 z-40">
           <TutorialButton onClick={handleTutorialClick} />
+        </div>
+      )}
+
+      {/* 模式切换按钮 - 随面板一起显示/隐藏，左侧 */}
+      {isPanelVisible && (
+        <div className="absolute top-20 md:top-6 left-4 md:left-6 z-40">
+          <ModeToggle mode={viewMode} onModeChange={setViewMode} variant="solid" />
         </div>
       )}
 

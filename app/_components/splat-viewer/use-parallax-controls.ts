@@ -60,8 +60,9 @@ export function useParallaxControls({
   });
 
   // 核心初始化逻辑
+  // skipCameraReset: 如果为 true，则不重置相机位置（用于过渡动画完成后的重新初始化）
   const doInitializeParallax = useCallback(
-    (mesh: SparkSplatMesh, cam: THREE.Camera, group: THREE.Group) => {
+    (mesh: SparkSplatMesh, cam: THREE.Camera, group: THREE.Group, skipCameraReset = false) => {
       const cvToGl = makeAxisFlipCvToGl();
 
       const e = stableExtrinsicCv;
@@ -82,10 +83,13 @@ export function useParallaxControls({
       const scale = new THREE.Vector3();
       cameraWorld.decompose(position, quaternion, scale);
 
-      cam.position.copy(position);
-      cam.quaternion.copy(quaternion);
-      cam.updateMatrix();
-      cam.updateMatrixWorld(true);
+      // 只有在非跳过模式下才重置相机位置
+      if (!skipCameraReset) {
+        cam.position.copy(position);
+        cam.quaternion.copy(quaternion);
+        cam.updateMatrix();
+        cam.updateMatrixWorld(true);
+      }
 
       const depthFocus = computeDepthFocus(mesh);
       console.log("[Parallax] Computed depth focus:", depthFocus);
@@ -94,9 +98,10 @@ export function useParallaxControls({
       group.updateMatrixWorld(true);
       const lookAtWorld = lookAtCv.clone().applyMatrix4(group.matrixWorld);
 
-      const basePosition = cam.position.clone();
+      // 使用计算出的目标位置作为基准（而非当前相机位置）
+      const basePosition = position.clone();
       const baseTarget = lookAtWorld;
-      const baseQuaternion = cam.quaternion.clone();
+      const baseQuaternion = quaternion.clone();
       const baseRight = new THREE.Vector3(1, 0, 0).applyQuaternion(baseQuaternion);
       const baseUp = new THREE.Vector3(0, 1, 0).applyQuaternion(baseQuaternion);
 
@@ -114,20 +119,15 @@ export function useParallaxControls({
         PARALLAX_STRENGTH_MULTIPLIER;
       const strength = baseStrength * (isMobile ? PARALLAX_STRENGTH_MOBILE_MULTIPLIER : 1);
 
-      // 保留当前的视差偏移值
-      const currentX = parallaxRef.current?.current.x ?? 0;
-      const currentY = parallaxRef.current?.current.y ?? 0;
-      const targetX = parallaxRef.current?.target.x ?? 0;
-      const targetY = parallaxRef.current?.target.y ?? 0;
-
+      // 重新初始化时重置视差偏移值为 0
       parallaxRef.current = {
         basePosition,
         baseTarget,
         baseRight,
         baseUp,
         strength,
-        current: new THREE.Vector2(currentX, currentY),
-        target: new THREE.Vector2(targetX, targetY),
+        current: new THREE.Vector2(0, 0),
+        target: new THREE.Vector2(0, 0),
       };
 
       applyCameraProjection();
@@ -138,6 +138,7 @@ export function useParallaxControls({
         strength,
         depthFocus,
         imageSize: [intrinsics.imageWidth, intrinsics.imageHeight],
+        skipCameraReset,
       });
     },
     [
@@ -150,11 +151,12 @@ export function useParallaxControls({
   );
 
   // 初始化视差状态
+  // skipCameraReset: 如果为 true，则不重置相机位置（用于过渡动画完成后的重新初始化）
   const initializeParallax = useCallback(
-    (mesh: SparkSplatMesh, cam: THREE.Camera, group: THREE.Group) => {
+    (mesh: SparkSplatMesh, cam: THREE.Camera, group: THREE.Group, skipCameraReset = false) => {
       meshRefInternal.current = mesh;
       groupRefInternal.current = group;
-      doInitializeParallax(mesh, cam, group);
+      doInitializeParallax(mesh, cam, group, skipCameraReset);
     },
     [doInitializeParallax]
   );

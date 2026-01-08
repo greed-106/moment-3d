@@ -114,3 +114,62 @@ export const makeProjectionFromIntrinsics = ({
     0, 0, -1, 0
   );
 };
+
+// ============ 计算照片模式的相机状态 ============
+export interface PhotoModeCameraState {
+  position: THREE.Vector3;
+  quaternion: THREE.Quaternion;
+  target: THREE.Vector3;
+}
+
+export const computePhotoModeCamera = (
+  mesh: SparkSplatMesh,
+  group: THREE.Group,
+  extrinsicCv: number[]
+): PhotoModeCameraState | null => {
+  if (!mesh || !group) return null;
+
+  const cvToGl = makeAxisFlipCvToGl();
+  const e = extrinsicCv;
+  const extrinsicMatrix = new THREE.Matrix4().set(
+    e[0], e[1], e[2], e[3],
+    e[4], e[5], e[6], e[7],
+    e[8], e[9], e[10], e[11],
+    e[12], e[13], e[14], e[15]
+  );
+
+  const view = new THREE.Matrix4()
+    .multiplyMatrices(cvToGl, extrinsicMatrix)
+    .multiply(cvToGl);
+  const cameraWorld = new THREE.Matrix4().copy(view).invert();
+
+  const position = new THREE.Vector3();
+  const quaternion = new THREE.Quaternion();
+  const scale = new THREE.Vector3();
+  cameraWorld.decompose(position, quaternion, scale);
+
+  const depthFocus = computeDepthFocus(mesh);
+  const lookAtCv = new THREE.Vector3(0, 0, depthFocus);
+  group.updateMatrixWorld(true);
+  const target = lookAtCv.clone().applyMatrix4(group.matrixWorld);
+
+  return { position, quaternion, target };
+};
+
+// ============ 计算漫游模式的等效 FOV ============
+export const computeRoamModeFov = (
+  intrinsics: { fy: number; imageWidth: number; imageHeight: number },
+  frameSize: { width: number; height: number },
+  screenHeight: number
+): number => {
+  const { fy, imageWidth, imageHeight } = intrinsics;
+  // 计算照片模式下的缩放因子
+  const sx = frameSize.width / imageWidth;
+  const sy = frameSize.height / imageHeight;
+  const s = Math.min(sx, sy);
+  // 缩放后的焦距
+  const scaledFy = fy * s;
+  // 计算等效 FOV：使得在全屏视口下，中心区域物体大小与照片模式一致
+  const fovRad = 2 * Math.atan(screenHeight / (2 * scaledFy));
+  return THREE.MathUtils.radToDeg(fovRad);
+};

@@ -5,6 +5,7 @@ import { Canvas } from "@react-three/fiber";
 import {
   SplatScene,
   type CameraMetadata,
+  type ViewMode,
   parseBackendMetadata,
   type BackendMetadata,
   isMobileDevice,
@@ -63,12 +64,14 @@ function useCameraMetadata(taskId: string) {
 interface SceneViewerProps {
   taskId: string;
   effect: EffectType;
+  viewMode: ViewMode;
   cameraMetadata: CameraMetadata | null;
 }
 
 const SceneViewer = memo(function SceneViewer({
   taskId,
   effect,
+  viewMode,
   cameraMetadata,
 }: SceneViewerProps) {
   return (
@@ -83,6 +86,7 @@ const SceneViewer = memo(function SceneViewer({
       <SplatScene
         url={`/api/result/${taskId}`}
         effect={effect}
+        viewMode={viewMode}
         cameraMetadata={cameraMetadata}
       />
     </Canvas>
@@ -92,6 +96,7 @@ const SceneViewer = memo(function SceneViewer({
 export default function ViewerPage({ params }: ViewerPageProps) {
   const { taskId } = use(params);
   const [effect, setEffect] = useState<EffectType>("None");
+  const [viewMode, setViewMode] = useState<ViewMode>("photo");
   const [showTutorial, setShowTutorial] = useState(false);
   const tutorialTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -139,13 +144,14 @@ export default function ViewerPage({ params }: ViewerPageProps) {
           <SceneViewer
             taskId={taskId}
             effect={effect}
+            viewMode={viewMode}
             cameraMetadata={cameraMetadata}
           />
         )}
       </Suspense>
 
-      {/* 顶部导航 */}
-      <ViewerHeader />
+      {/* 顶部导航（包含返回按钮和模式切换） */}
+      <ViewerHeader viewMode={viewMode} onViewModeChange={setViewMode} />
 
       {/* 粒子效果控制 */}
       <EffectControl

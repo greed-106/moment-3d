@@ -24,12 +24,17 @@ export {
   computeDepthFocus,
   isMobileDevice,
   makeProjectionFromIntrinsics,
+  computePhotoModeCamera,
+  computeRoamModeFov,
 } from "./utils";
+export type { PhotoModeCameraState } from "./utils";
 
 // Hook 导出
 export { useParallaxControls } from "./use-parallax-controls";
 export { useCameraProjection } from "./use-camera-projection";
 export { useDragControls } from "./use-drag-controls";
+export { useCameraTransition } from "./use-camera-transition";
 
 // 组件导出
 export { SplatScene } from "./splat-scene";
+export type { ViewMode } from "./splat-scene";
