@@ -1,10 +1,15 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, memo } from "react";
 import { useRouter } from "next/navigation";
 import { Canvas } from "@react-three/fiber";
 import { motion, AnimatePresence } from "framer-motion";
-import { SplatScene } from "@/app/_components/splat-scene";
+import {
+  SplatScene,
+  parseBackendMetadata,
+  type CameraMetadata,
+  type BackendMetadata,
+} from "@/app/_components/splat-scene";
 import { ProgressBar } from "./_components/progress-bar";
 import { InteractionTutorial } from "@/app/_components/interaction-tutorial";
 import { TutorialButton } from "@/app/_components/tutorial-button";
@@ -21,6 +26,36 @@ type ProcessStatus =
 
 const ENTRANCE_DURATION = 3000;
 
+// 将 3D 场景抽离为独立的 memo 组件，避免父组件状态变化导致重新渲染
+interface SceneBackgroundProps {
+  cameraMetadata: CameraMetadata | null;
+  onLoaded: () => void;
+}
+
+const SceneBackground = memo(function SceneBackground({
+  cameraMetadata,
+  onLoaded,
+}: SceneBackgroundProps) {
+  return (
+    <div className="absolute inset-0">
+      <Canvas
+        gl={{ antialias: false }}
+        style={{
+          background:
+            "linear-gradient(135deg, #faf7f0 0%, #f5f1e8 50%, #ede7d3 100%)",
+        }}
+      >
+        <SplatScene
+          url="/demo.sog"
+          effect="Magic"
+          onLoaded={onLoaded}
+          cameraMetadata={cameraMetadata}
+        />
+      </Canvas>
+    </div>
+  );
+});
+
 export default function Home() {
   const router = useRouter();
   const [status, setStatus] = useState<ProcessStatus>("idle");
@@ -34,9 +69,33 @@ export default function Home() {
   const [isTitleAtTop, setIsTitleAtTop] = useState(false);
   const [isPanelVisible, setIsPanelVisible] = useState(false);
   const [isFirstShow, setIsFirstShow] = useState(true);
+  
+  // Demo 场景的相机元数据
+  const [demoCameraMetadata, setDemoCameraMetadata] =
+    useState<CameraMetadata | null>(null);
 
+  // 稳定 onLoaded 回调的引用
   const handleSceneLoaded = useCallback(() => {
     setIsSceneLoaded(true);
+  }, []);
+
+  // 加载 demo 场景的元数据
+  useEffect(() => {
+    const loadDemoMetadata = async () => {
+      try {
+        const response = await fetch("/demo-meta.json");
+        if (response.ok) {
+          const data: BackendMetadata = await response.json();
+          const parsed = parseBackendMetadata(data);
+          if (parsed) {
+            setDemoCameraMetadata(parsed);
+          }
+        }
+      } catch (error) {
+        console.warn("[Home] Failed to load demo metadata:", error);
+      }
+    };
+    loadDemoMetadata();
   }, []);
 
   // 场景加载完成后，3秒后标题开始移动，标题移动完成后再显示面板
@@ -206,7 +265,6 @@ export default function Home() {
 
   const handleTutorialClick = () => {
     setShowTutorial(true);
-    localStorage.setItem("moment3d-tutorial-seen", "true");
   };
 
   const handleCloseTutorial = () => {
@@ -221,18 +279,11 @@ export default function Home() {
       onDrop={handleDrop}
       onDragOver={handleDragOver}
     >
-      {/* 3D 背景 */}
-      <div className="absolute inset-0">
-        <Canvas
-          gl={{ antialias: false }}
-          style={{
-            background:
-              "linear-gradient(135deg, #faf7f0 0%, #f5f1e8 50%, #ede7d3 100%)",
-          }}
-        >
-          <SplatScene url="/demo.sog" effect="Magic" onLoaded={handleSceneLoaded} />
-        </Canvas>
-      </div>
+      {/* 3D 背景 - 使用 memo 组件避免重新渲染 */}
+      <SceneBackground
+        cameraMetadata={demoCameraMetadata}
+        onLoaded={handleSceneLoaded}
+      />
 
       {/* 标题 - 始终存在，位置根据状态变化 */}
       {isSceneLoaded && (
@@ -268,21 +319,15 @@ export default function Home() {
       )}
 
       {/* 面板 */}
-      <AnimatePresence mode="wait">
+      <AnimatePresence>
         {isTitleAtTop && isPanelVisible && (
-          <motion.div
-            className="absolute inset-x-0 top-[33%] -translate-y-1/2 flex justify-center z-30 px-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
-          >
+          <div className="absolute inset-x-0 top-[33%] -translate-y-1/2 flex justify-center z-30 px-4">
             <GlassPanel onCollapse={collapsePanel} slideDirection={isFirstShow ? "up" : "down"}>
-              <p className="text-center text-stone-700 mb-3 text-xl font-medium">
+              <p className="text-center text-stone-700 mb-2 text-xl font-medium">
                 定格瞬间，留住世界
               </p>
 
-              <p className="text-center text-stone-500 text-sm mb-4 leading-relaxed">
+              <p className="text-center text-stone-500 text-sm mb-3 leading-snug">
                 每一张照片都承载着珍贵的回忆
                 <br />
                 将美好的时光转化为可以重新体验的 3D 世界
@@ -303,7 +348,7 @@ export default function Home() {
                   <button
                     type="button"
                     onClick={handleClick}
-                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg bg-stone-700 hover:bg-stone-800 text-white font-medium transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-stone-700 hover:bg-stone-800 text-white font-medium transition-colors cursor-pointer"
                   >
                     <svg
                       className="w-5 h-5"
@@ -320,7 +365,7 @@ export default function Home() {
                     </svg>
                     <span>回到那天 →</span>
                   </button>
-                  <p className="mt-3 text-stone-400 text-xs">
+                  <p className="mt-2 text-stone-400 text-xs">
                     支持 JPG、PNG 格式 · 点击或拖放图片
                   </p>
                 </div>
@@ -353,24 +398,16 @@ export default function Home() {
                 </div>
               )}
             </GlassPanel>
-          </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
       {/* 交互教程按钮 - 随面板一起显示/隐藏 */}
-      <AnimatePresence>
-        {isPanelVisible && (
-          <motion.div
-            className="absolute top-20 md:top-6 right-4 md:right-6 z-40"
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 50 }}
-            transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
-          >
-            <TutorialButton onClick={handleTutorialClick} />
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {isPanelVisible && (
+        <div className="absolute top-20 md:top-6 right-4 md:right-6 z-40">
+          <TutorialButton onClick={handleTutorialClick} />
+        </div>
+      )}
 
       {/* 交互教程弹窗 */}
       {showTutorial && <InteractionTutorial onClose={handleCloseTutorial} />}
