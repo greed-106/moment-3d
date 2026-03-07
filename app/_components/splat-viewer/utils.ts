@@ -105,7 +105,7 @@ export const makeProjectionFromIntrinsics = ({
   const left = (-cx * near) / fx;
   const right = ((width - cx) * near) / fx;
   const top = (cy * near) / fy;
-  const bottom = (-(height - cy) * near) / fy;
+  const bottom = (-(height - cy) / fy);
 
   return new THREE.Matrix4().set(
     (2 * near) / (right - left), 0, (right + left) / (right - left), 0,
@@ -115,18 +115,17 @@ export const makeProjectionFromIntrinsics = ({
   );
 };
 
-// ============ 计算照片模式的相机状态 ============
-export interface PhotoModeCameraState {
+// ============ 计算漫游模式的初始相机状态 ============
+export interface RoamCameraState {
   position: THREE.Vector3;
   quaternion: THREE.Quaternion;
-  target: THREE.Vector3;
 }
 
-export const computePhotoModeCamera = (
+export const computeInitialRoamCamera = (
   mesh: SparkSplatMesh,
   group: THREE.Group,
   extrinsicCv: number[]
-): PhotoModeCameraState | null => {
+): RoamCameraState | null => {
   if (!mesh || !group) return null;
 
   const cvToGl = makeAxisFlipCvToGl();
@@ -148,12 +147,7 @@ export const computePhotoModeCamera = (
   const scale = new THREE.Vector3();
   cameraWorld.decompose(position, quaternion, scale);
 
-  const depthFocus = computeDepthFocus(mesh);
-  const lookAtCv = new THREE.Vector3(0, 0, depthFocus);
-  group.updateMatrixWorld(true);
-  const target = lookAtCv.clone().applyMatrix4(group.matrixWorld);
-
-  return { position, quaternion, target };
+  return { position, quaternion };
 };
 
 // ============ 计算漫游模式的等效 FOV ============

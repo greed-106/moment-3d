@@ -10,11 +10,9 @@ import {
   type CameraMetadata,
   type BackendMetadata,
 } from "@/app/_components/splat-scene";
-import type { ViewMode } from "@/app/_components/splat-viewer";
 import { ProgressBar } from "./_components/progress-bar";
 import { InteractionTutorial } from "@/app/_components/interaction-tutorial";
 import { TutorialButton } from "@/app/_components/tutorial-button";
-import { ModeToggle } from "@/app/_components/mode-toggle";
 import { AnimatedTitle, GlassPanel, ExpandButton } from "@/app/_components/home-ui";
 
 type ProcessStatus =
@@ -31,14 +29,14 @@ const ENTRANCE_DURATION = 3000;
 // 将 3D 场景抽离为独立的 memo 组件，避免父组件状态变化导致重新渲染
 interface SceneBackgroundProps {
   cameraMetadata: CameraMetadata | null;
-  viewMode: ViewMode;
   onLoaded: () => void;
+  resetCameraHandler?: { reset?: () => void };
 }
 
 const SceneBackground = memo(function SceneBackground({
   cameraMetadata,
-  viewMode,
   onLoaded,
+  resetCameraHandler,
 }: SceneBackgroundProps) {
   return (
     <div className="absolute inset-0">
@@ -52,9 +50,9 @@ const SceneBackground = memo(function SceneBackground({
         <SplatScene
           url="/demo.sog"
           effect="Magic"
-          viewMode={viewMode}
           onLoaded={onLoaded}
           cameraMetadata={cameraMetadata}
+          resetCameraHandler={resetCameraHandler}
         />
       </Canvas>
     </div>
@@ -74,11 +72,13 @@ export default function Home() {
   const [isTitleAtTop, setIsTitleAtTop] = useState(false);
   const [isPanelVisible, setIsPanelVisible] = useState(false);
   const [isFirstShow, setIsFirstShow] = useState(true);
-  const [viewMode, setViewMode] = useState<ViewMode>("photo");
   
   // Demo 场景的相机元数据
   const [demoCameraMetadata, setDemoCameraMetadata] =
     useState<CameraMetadata | null>(null);
+  
+  // 相机复位处理
+  const resetCameraHandler = useRef<{ reset?: () => void }>({});
 
   // 稳定 onLoaded 回调的引用
   const handleSceneLoaded = useCallback(() => {
@@ -277,6 +277,10 @@ export default function Home() {
     setShowTutorial(false);
   };
 
+  const handleResetCamera = () => {
+    resetCameraHandler.current.reset?.();
+  };
+
   const isProcessing = status !== "idle" && status !== "failed" && !isNavigating;
 
   return (
@@ -288,8 +292,8 @@ export default function Home() {
       {/* 3D 背景 - 使用 memo 组件避免重新渲染 */}
       <SceneBackground
         cameraMetadata={demoCameraMetadata}
-        viewMode={viewMode}
         onLoaded={handleSceneLoaded}
+        resetCameraHandler={resetCameraHandler.current}
       />
 
       {/* 标题 - 始终存在，位置根据状态变化 */}
@@ -416,10 +420,33 @@ export default function Home() {
         </div>
       )}
 
-      {/* 模式切换按钮 - 随面板一起显示/隐藏，左侧 */}
+      {/* 相机复位按钮 - 左上角 */}
       {isPanelVisible && (
-        <div className="absolute top-20 md:top-6 left-4 md:left-6 z-40">
-          <ModeToggle mode={viewMode} onModeChange={setViewMode} variant="solid" />
+        <div className="absolute top-6 left-6 z-40 pointer-events-none">
+          <div className="pointer-events-auto">
+            <button
+              onClick={handleResetCamera}
+              className="relative flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-white/70 backdrop-blur-md border border-white/50 text-stone-700 hover:bg-white/80 hover:text-stone-800 transition-all shadow-[0_8px_32px_rgba(0,0,0,0.12)] active:scale-[0.98] overflow-hidden"
+            >
+              {/* 顶部高光边缘 */}
+              <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/60 to-transparent" />
+              
+              <svg
+                className="w-5 h-5 relative z-10"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+              <span className="relative z-10">相机复位</span>
+            </button>
+          </div>
         </div>
       )}
 

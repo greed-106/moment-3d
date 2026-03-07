@@ -10,5 +10,4 @@ export type {
   CameraIntrinsics,
   CameraMetadata,
   BackendMetadata,
-  ViewMode,
 } from "./splat-viewer";

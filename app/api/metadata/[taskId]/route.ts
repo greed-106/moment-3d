@@ -9,7 +9,7 @@ export async function GET(
   const { taskId } = await params;
 
   try {
-    const response = await fetch(`${BACKEND_URL}/metadata/${taskId}`);
+    const response = await fetch(`${BACKEND_URL}/tasks/${taskId}/metadata`);
 
     if (!response.ok) {
       return NextResponse.json(
