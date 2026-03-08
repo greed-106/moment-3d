@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect, memo } from "react";
-import { useRouter } from "next/navigation";
 import { Canvas } from "@react-three/fiber";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -10,19 +9,9 @@ import {
   type CameraMetadata,
   type BackendMetadata,
 } from "@/app/_components/splat-scene";
-import { ProgressBar } from "./_components/progress-bar";
 import { InteractionTutorial } from "@/app/_components/interaction-tutorial";
 import { TutorialButton } from "@/app/_components/tutorial-button";
 import { AnimatedTitle, GlassPanel, ExpandButton } from "@/app/_components/home-ui";
-
-type ProcessStatus =
-  | "idle"
-  | "uploading"
-  | "queued"
-  | "converting"
-  | "compressing"
-  | "completed"
-  | "failed";
 
 const ENTRANCE_DURATION = 3000;
 
@@ -60,14 +49,7 @@ const SceneBackground = memo(function SceneBackground({
 });
 
 export default function Home() {
-  const router = useRouter();
-  const [status, setStatus] = useState<ProcessStatus>("idle");
-  const [errorMessage, setErrorMessage] = useState<string>("");
   const [showTutorial, setShowTutorial] = useState(false);
-  const [isNavigating, setIsNavigating] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  // UI 状态
   const [isSceneLoaded, setIsSceneLoaded] = useState(false);
   const [isTitleAtTop, setIsTitleAtTop] = useState(false);
   const [isPanelVisible, setIsPanelVisible] = useState(false);
@@ -130,165 +112,20 @@ export default function Home() {
     setIsPanelVisible(true);
   }, []);
 
-  const handleUpload = useCallback(
-    async (file: File) => {
-      setStatus("uploading");
-      setErrorMessage("");
-
-      try {
-        const formData = new FormData();
-        formData.append("file", file);
-
-        const response = await fetch("/api/predict", {
-          method: "POST",
-          body: formData,
-        });
-
-        if (!response.ok) {
-          throw new Error("上传失败");
-        }
-
-        const data = await response.json();
-        const newTaskId = data.task_id;
-        setStatus(data.status as ProcessStatus);
-
-        const eventSource = new EventSource(`/api/stream/${newTaskId}`);
-        let hasCompleted = false;
-
-        eventSource.addEventListener("status", (event) => {
-          try {
-            const statusData = JSON.parse(event.data);
-
-            if (statusData.status === "completed") {
-              hasCompleted = true;
-              eventSource.close();
-              setIsNavigating(true);
-              setTimeout(() => {
-                router.push(`/viewer/${newTaskId}`);
-              }, 100);
-            } else if (statusData.status === "failed") {
-              hasCompleted = true;
-              eventSource.close();
-              setStatus("failed");
-              setErrorMessage(statusData.message || "处理失败");
-            } else {
-              setStatus(statusData.status as ProcessStatus);
-            }
-          } catch (e) {
-            console.error("Failed to parse SSE data:", e);
-          }
-        });
-
-        eventSource.onerror = () => {
-          eventSource.close();
-
-          if (!hasCompleted) {
-            setTimeout(() => {
-              const retrySource = new EventSource(`/api/stream/${newTaskId}`);
-
-              retrySource.addEventListener("status", (retryEvent) => {
-                try {
-                  const retryData = JSON.parse(retryEvent.data);
-                  if (retryData.status === "completed") {
-                    hasCompleted = true;
-                    retrySource.close();
-                    setIsNavigating(true);
-                    setTimeout(() => {
-                      router.push(`/viewer/${newTaskId}`);
-                    }, 100);
-                  } else if (retryData.status === "failed") {
-                    hasCompleted = true;
-                    retrySource.close();
-                    setStatus("failed");
-                    setErrorMessage(retryData.message || "处理失败");
-                  } else {
-                    setStatus(retryData.status as ProcessStatus);
-                  }
-                } catch {
-                  retrySource.close();
-                  setStatus("failed");
-                  setErrorMessage("连接中断");
-                }
-              });
-
-              retrySource.onerror = () => {
-                retrySource.close();
-                if (!hasCompleted) {
-                  setStatus("failed");
-                  setErrorMessage("连接中断");
-                }
-              };
-            }, 1000);
-          }
-        };
-      } catch (error) {
-        setStatus("failed");
-        setErrorMessage(error instanceof Error ? error.message : "未知错误");
-      }
-    },
-    [router]
-  );
-
-  const handleFileChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (file && file.type.startsWith("image/")) {
-        handleUpload(file);
-      }
-    },
-    [handleUpload]
-  );
-
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      const file = e.dataTransfer.files[0];
-      if (file && file.type.startsWith("image/")) {
-        handleUpload(file);
-      }
-    },
-    [handleUpload]
-  );
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-  }, []);
-
-  const handleClick = useCallback(() => {
-    if (status === "idle" || status === "failed") {
-      inputRef.current?.click();
-    }
-  }, [status]);
-
-  const handleReset = useCallback(() => {
-    setStatus("idle");
-    setErrorMessage("");
-    setIsNavigating(false);
-    if (inputRef.current) {
-      inputRef.current.value = "";
-    }
-  }, []);
-
-  const handleTutorialClick = () => {
+  const handleTutorialClick = useCallback(() => {
     setShowTutorial(true);
-  };
+  }, []);
 
-  const handleCloseTutorial = () => {
+  const handleCloseTutorial = useCallback(() => {
     setShowTutorial(false);
-  };
+  }, []);
 
   const handleResetCamera = () => {
     resetCameraHandler.current.reset?.();
   };
 
-  const isProcessing = status !== "idle" && status !== "failed" && !isNavigating;
-
   return (
-    <main
-      className="h-screen w-screen relative overflow-hidden bg-gradient-to-br from-stone-50 to-stone-100"
-      onDrop={handleDrop}
-      onDragOver={handleDragOver}
-    >
+    <main className="h-screen w-screen relative overflow-hidden bg-gradient-to-br from-stone-50 to-stone-100">
       {/* 3D 背景 - 使用 memo 组件避免重新渲染 */}
       <SceneBackground
         cameraMetadata={demoCameraMetadata}
@@ -338,76 +175,13 @@ export default function Home() {
                 定格瞬间，留住世界
               </p>
 
-              <p className="text-center text-stone-500 text-sm mb-3 leading-snug">
+              <p className="text-center text-stone-500 text-sm leading-snug">
                 每一张照片都承载着珍贵的回忆
                 <br />
                 将美好的时光转化为可以重新体验的 3D 世界
                 <br />
                 让记忆变得触手可及
               </p>
-
-              <input
-                ref={inputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleFileChange}
-                className="hidden"
-              />
-
-              {status === "idle" && (
-                <div className="text-center">
-                  <button
-                    type="button"
-                    onClick={handleClick}
-                    className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-stone-700 hover:bg-stone-800 text-white font-medium transition-colors cursor-pointer"
-                  >
-                    <svg
-                      className="w-5 h-5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1.5}
-                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                      />
-                    </svg>
-                    <span>回到那天 →</span>
-                  </button>
-                  <p className="mt-2 text-stone-400 text-xs">
-                    支持 JPG、PNG 格式 · 点击或拖放图片
-                  </p>
-                </div>
-              )}
-
-              {isProcessing && <ProgressBar status={status} />}
-
-              {isNavigating && (
-                <div className="text-center">
-                  <div className="inline-flex items-center gap-3 text-stone-600">
-                    <div className="w-5 h-5 border-2 border-stone-600 border-t-transparent rounded-full animate-spin" />
-                    <span className="text-sm">正在跳转...</span>
-                  </div>
-                </div>
-              )}
-
-              {status === "failed" && (
-                <div className="text-center space-y-4">
-                  <p className="text-red-600 text-sm">{errorMessage}</p>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleReset();
-                    }}
-                    className="px-5 py-2 rounded-lg bg-stone-700 hover:bg-stone-800 text-white text-sm transition-colors"
-                  >
-                    重试
-                  </button>
-                </div>
-              )}
             </GlassPanel>
           </div>
         )}

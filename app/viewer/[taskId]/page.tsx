@@ -31,7 +31,7 @@ function useCameraMetadata(taskId: string) {
         setLoading(true);
         setError(null);
 
-        const response = await fetch(`/api/metadata/${taskId}`);
+        const response = await fetch(`/api/tasks/${taskId}/metadata`);
 
         if (!response.ok) {
           throw new Error(`获取元数据失败: ${response.status}`);
@@ -83,7 +83,7 @@ const SceneViewer = memo(function SceneViewer({
       }}
     >
       <SplatScene
-        url={`/api/result/${taskId}`}
+        url={`/api/tasks/${taskId}/assets`}
         effect={effect}
         cameraMetadata={cameraMetadata}
         resetCameraHandler={resetCameraHandler}

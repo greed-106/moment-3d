@@ -13,7 +13,7 @@ export async function GET(
 
     if (!response.ok) {
       return NextResponse.json(
-        { error: "Result not found" },
+        { error: "Assets not found" },
         { status: response.status }
       );
     }
@@ -28,9 +28,9 @@ export async function GET(
 
     return new NextResponse(blob, { headers });
   } catch (error) {
-    console.error("Result API error:", error);
+    console.error("Assets API error:", error);
     return NextResponse.json(
-      { error: "Failed to fetch result" },
+      { error: "Failed to fetch assets" },
       { status: 500 }
     );
   }
